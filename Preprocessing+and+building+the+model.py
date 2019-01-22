@@ -1,9 +1,6 @@
 
 # coding: utf-8
 
-# In[57]:
-
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,15 +10,22 @@ import pickle
 #import keras 
 from keras.models import Sequential
 from keras.layers import LSTM, Dense, Activation, Dropout
-from keras.optimizers import RMSprop
+from keras.optimizers import Adam
 import h5py
 
 # check if tensorflow is using gpu
 from tensorflow.python.client import device_lib
 print(device_lib.list_local_devices())
 
-# In[58]:
+unwanted_chars = ['!', '"', '%', '&', "'", '(', ')', '*', ',', '-', '.', '/', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '?', '[', ']', '{', '}']
 
+# create function to remove unwanted characters in text. Makes training easier
+def remove_chars(text, chars):
+    for char in chars:
+        if text:
+            text_cleaned = text.replace(char, "")
+            text = text_cleaned
+    return text
 
 
 # load all songs
@@ -31,7 +35,9 @@ text =""
 
 # merge all the lyrics together into one huge string
 for index, row in songs['lyrics'].iteritems():
-    text = text + str(row).lower()
+    stripped_text = remove_chars(str(row).lower(), unwanted_chars)
+    text = text + stripped_text
+
 
 # find all the unique chracters
 chars = sorted(list(set(text)))
@@ -66,67 +72,33 @@ for i, sentence in enumerate(sentences):
     y[i, char_indices[next_chars[i]]] = 1
 
 
-# In[59]:
-
-
 # create sequential network, because we are passing activations
 # down the network
 model = Sequential()
 
 # add LSTM layer
-model.add(LSTM(512, input_shape=(maxlen, len(chars)), return_sequences=True))
+model.add(LSTM(256, input_shape=(maxlen, len(chars)) ))
 model.add(Dropout(0.2))
-model.add(LSTM(128))
 
-# add Softmax layer to output one character 
+# add Softmax layer to output one character
 model.add(Dense(len(chars)))
 model.add(Activation('softmax'))
 
 # compile the model and pick the loss and optimizer
-model.compile(loss='categorical_crossentropy', optimizer=RMSprop(lr=0.001))
+model.compile(loss='categorical_crossentropy', optimizer='Adam')
 
 # train the model
-history = model.fit(x, y, validation_split=0.1, batch_size=200, epochs=50, verbose=1)
-
-
-# In[ ]:
-
-
-# summarize history for accuracy
-plt.plot(history.history['acc'])
-plt.plot(history.history['val_acc'])
-plt.title('model accuracy')
-plt.ylabel('accuracy')
-plt.xlabel('epoch')
-plt.legend(['train', 'test'], loc='upper left')
-plt.show()
-# summarize history for loss
-plt.plot(history.history['loss'])
-plt.plot(history.history['val_loss'])
-plt.title('model loss')
-plt.ylabel('loss')
-plt.xlabel('epoch')
-plt.legend(['train', 'test'], loc='upper left')
-plt.show()
-
-
-# In[4]:
+history = model.fit(x, y,  validation_split=0.1, batch_size=128, epochs=75, verbose=1)
 
 
 # save the model
 model.save('files/Aiminem_model.h5')  # creates a HDF5 file 'my_model.h5'
 
+objects_vars = {"chars": chars, "char_indices": char_indices, "indices_char": indices_char, "history": history}
 
-# In[5]:
-
-
-objects_vars = {"chars": chars, "char_indices": char_indices, "indices_char": indices_char}
-
-
-for name, object_var in objects_vars.items():    
+for name, object_var in objects_vars.items():
     # save
     name_file = "files/" + name + ".pkl"
     outfile = open(name_file,'wb')
     pickle.dump(object_var, outfile)
     outfile.close()
-
